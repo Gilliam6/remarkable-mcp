@@ -189,6 +189,8 @@ You're connected directly to the tablet via SSH. This enables:
 Write operations are enabled. These tools modify your tablet's filesystem:
 
 - `remarkable_upload(file_path, parent_folder, document_name, defer_restart)` - Upload a PDF/EPUB
+- `remarkable_upload_url(url, document_name, parent_folder, defer_restart)` - Fetch a public
+  https:// PDF/EPUB and upload it (for remote clients without a shared filesystem)
 - `remarkable_markdown_to_pdf(markdown, document_name, parent_folder, defer_restart)` -
   Render Markdown as a PDF and upload it
 - `remarkable_mkdir(folder_name, parent, defer_restart)` - Create a folder
@@ -215,6 +217,7 @@ Write operations are enabled. These tools modify your tablet's filesystem:
 Upload is available via the USB web interface:
 
 - `remarkable_upload(file_path)` - Upload a PDF/EPUB file
+- `remarkable_upload_url(url, document_name)` - Fetch a public https:// PDF/EPUB and upload it
 - `remarkable_markdown_to_pdf(markdown, document_name)` - Render Markdown as a
   named PDF and upload it to the root folder
 
@@ -238,6 +241,8 @@ Write operations are enabled (the default). These tools modify your cloud librar
 and sync to all your devices:
 
 - `remarkable_upload(file_path, parent_folder, document_name)` - Upload a PDF/EPUB
+- `remarkable_upload_url(url, document_name, parent_folder)` - Fetch a public https:// PDF/EPUB
+  and upload it
 - `remarkable_markdown_to_pdf(markdown, document_name, parent_folder)` - Render
   Markdown as a PDF and upload it
 - `remarkable_mkdir(folder_name, parent)` - Create a folder
