@@ -668,6 +668,7 @@ Or set the environment variable:
 |------|-------------|
 | `remarkable_upload(file_path, parent_folder, document_name, defer_restart)` | Upload a PDF or EPUB file (cloud, SSH, and USB web; USB web preserves the name but ignores `parent_folder`) |
 | `remarkable_upload_url(url, document_name, parent_folder, defer_restart)` | Download a PDF/EPUB from a public `https://` URL and upload it. For remote MCP clients (e.g. ChatGPT) whose files are not on the server's disk. Refuses non-public IPs (SSRF guard), re-checks redirects, verifies the file by content, caps size at `REMARKABLE_UPLOAD_URL_MAX_MB` (default 50). The URL must be reachable by the server — `sandbox://` links won't work |
+| `remarkable_upload_base64(content_base64, document_name, parent_folder, defer_restart)` | Upload a small PDF/EPUB passed inline as base64 — fallback for remote clients (e.g. ChatGPT) that have no public URL for the file. Strict base64, type verified by content, decoded size capped at `REMARKABLE_UPLOAD_BASE64_MAX_MB` (default 10); costs context tokens, prefer `remarkable_upload_url` when a link exists |
 | `remarkable_markdown_to_pdf(markdown, document_name, parent_folder, defer_restart)` | Render Markdown as a paginated PDF and upload it (cloud, SSH, and USB web) |
 | `remarkable_mkdir(folder_name, parent, defer_restart)` | Create a new folder (cloud and SSH) |
 | `remarkable_move(document, dest_folder, defer_restart)` | Move a document or folder (cloud and SSH) |

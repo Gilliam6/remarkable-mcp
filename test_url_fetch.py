@@ -162,3 +162,65 @@ async def test_tool_surfaces_fetch_error():
 
     result = await _call_tool("remarkable_upload_url", {"url": "http://example.com/a.pdf"})
     assert json.loads(result.content[0].text)["_error"]["type"] == "invalid_url"
+
+
+async def _b64_call(args, client=None):
+    from test_server import _call_tool
+
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("REMARKABLE_USE_SSH", "REMARKABLE_USE_USB_WEB")
+    }
+    client = client or Mock(spec=["get_meta_items", "upload_document"])
+    client.get_meta_items.return_value = []
+    client.upload_document.return_value = Mock(id="doc-id")
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch("remarkable_mcp.write_tools.get_rmapi", return_value=client),
+    ):
+        result = await _call_tool("remarkable_upload_base64", args)
+    return json.loads(result.content[0].text), client
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body,ext", [(PDF, "pdf"), (_epub(), "epub")])
+async def test_base64_uploads_and_ignores_whitespace(body, ext):
+    import base64
+
+    b64 = base64.b64encode(body).decode()
+    wrapped = "\n".join(b64[i : i + 20] for i in range(0, len(b64), 20))
+    data, client = await _b64_call({"content_base64": wrapped, "document_name": "Doc"})
+    assert data["uploaded"] is True and data["name"] == "Doc"
+    content, name, got_ext, _ = client.upload_document.call_args.args
+    assert content == body and got_ext == ext
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload,err",
+    [
+        ("not*base64!", "invalid_base64"),
+        ("data:application/pdf;base64,AAAA", "invalid_base64"),
+        ("aGVsbG8gd29ybGQ=", "unsupported_format"),  # valid base64, not a PDF/EPUB
+    ],
+)
+async def test_base64_rejects_bad_payloads(payload, err):
+    data, client = await _b64_call({"content_base64": payload, "document_name": "X"})
+    assert data["_error"]["type"] == err
+    client.upload_document.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_base64_size_cap():
+    import base64
+
+    big = base64.b64encode(PDF + b"x" * 100).decode()
+    with patch.dict(os.environ, {"REMARKABLE_UPLOAD_BASE64_MAX_MB": "0.00001"}):
+        from test_server import _call_tool
+
+        with patch("remarkable_mcp.write_tools.get_rmapi", return_value=Mock()):
+            result = await _call_tool(
+                "remarkable_upload_base64", {"content_base64": big, "document_name": "X"}
+            )
+    assert json.loads(result.content[0].text)["_error"]["type"] == "too_large"

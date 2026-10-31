@@ -1929,6 +1929,81 @@ def register_write_tools():
                 defer_restart=defer_restart,
             )
 
+    @mcp.tool(annotations=UPLOAD_ANNOTATIONS)
+    async def remarkable_upload_base64(
+        content_base64: str,
+        document_name: str,
+        parent_folder: str = "/",
+        defer_restart: bool = False,
+    ) -> str:
+        """
+        <usecase>Upload a small PDF or EPUB passed inline as base64 to the tablet.</usecase>
+        <instructions>
+        For remote MCP clients (e.g. ChatGPT) that generated a file but cannot
+        expose it at a URL or on the server's disk. Prefer remarkable_upload_url
+        when the file is reachable by link: base64 consumes context tokens and
+        is only practical for small files (REMARKABLE_UPLOAD_BASE64_MAX_MB,
+        default 10, applied to the decoded size).
+
+        The payload must be standard base64 (whitespace is ignored). The type
+        is verified from the decoded content (PDF/EPUB), not the name.
+        Upload semantics match remarkable_upload.
+        </instructions>
+        <parameters>
+        - content_base64: base64 of the PDF/EPUB bytes. No data: URI prefix.
+        - document_name: Display name on the tablet.
+        - parent_folder: Destination folder (default "/"; ignored by USB web).
+        - defer_restart: SSH only, as in remarkable_upload.
+        </parameters>
+        <examples>
+        - remarkable_upload_base64(content_base64="JVBERi0x...", document_name="Notes")
+        </examples>
+        """
+        import base64
+        import binascii
+        import tempfile
+
+        from remarkable_mcp import url_fetch
+
+        limit = int(float(os.environ.get("REMARKABLE_UPLOAD_BASE64_MAX_MB", "10")) * 1024 * 1024)
+        suggestion = (
+            "Send a standard-base64 PDF/EPUB under the size limit, or use remarkable_upload_url."
+        )
+        b64 = "".join(content_base64.split())
+        if len(b64) > limit * 4 // 3 + 4:  # reject before allocating the decoded copy
+            return make_error(
+                error_type="too_large",
+                message=f"Payload exceeds the {limit // (1024 * 1024)} MB decoded limit",
+                suggestion=suggestion,
+            )
+        try:
+            data = base64.b64decode(b64, validate=True)
+        except (binascii.Error, ValueError):
+            return make_error(
+                error_type="invalid_base64",
+                message="content_base64 is not valid standard base64",
+                suggestion=suggestion,
+            )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "upload.bin")
+            with open(path, "wb") as f:
+                f.write(data)
+            kind = url_fetch.sniff(path)
+            if kind is None:
+                return make_error(
+                    error_type="unsupported_format",
+                    message="Decoded content is not a valid PDF or EPUB",
+                    suggestion=suggestion,
+                )
+            final = os.path.join(temp_dir, f"document.{kind}")
+            os.replace(path, final)
+            return await remarkable_upload(
+                final,
+                parent_folder=parent_folder,
+                document_name=document_name,
+                defer_restart=defer_restart,
+            )
+
     if _is_ssh_mode() or _is_cloud_mode():
 
         @mcp.tool(annotations=MKDIR_ANNOTATIONS)
