@@ -1874,6 +1874,61 @@ def register_write_tools():
                 defer_restart=defer_restart,
             )
 
+    @mcp.tool(annotations=UPLOAD_ANNOTATIONS)
+    async def remarkable_upload_url(
+        url: str,
+        document_name: Optional[str] = None,
+        parent_folder: str = "/",
+        defer_restart: bool = False,
+    ) -> str:
+        """
+        <usecase>Download a PDF/EPUB from a public HTTPS URL and upload it to the tablet.</usecase>
+        <instructions>
+        Use this when the file lives at a URL the MCP server can reach (e.g. a
+        presigned/temporary link) rather than on the server's own disk, which is
+        the case for remote MCP clients such as ChatGPT. A sandbox:// or
+        client-local link will NOT work: the server fetches the URL itself.
+
+        Only https:// URLs resolving to public IP addresses are fetched
+        (loopback/private/link-local/metadata addresses are refused, redirects
+        are re-checked). The file type is verified from its content, not the
+        Content-Type header. Size is capped (REMARKABLE_UPLOAD_URL_MAX_MB,
+        default 50). Upload semantics match remarkable_upload.
+        </instructions>
+        <parameters>
+        - url: https:// link to a PDF or EPUB.
+        - document_name: Display name (default: last URL path segment).
+        - parent_folder: Destination folder (default "/"; ignored by USB web).
+        - defer_restart: SSH only, as in remarkable_upload.
+        </parameters>
+        <examples>
+        - remarkable_upload_url("https://example.com/notes.pdf", parent_folder="/Study")
+        </examples>
+        """
+        import tempfile
+        from urllib.parse import unquote, urlsplit
+
+        from remarkable_mcp import url_fetch
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                path, kind = await asyncio.to_thread(url_fetch.download, url, temp_dir)
+            except url_fetch.FetchError as e:
+                return make_error(
+                    error_type=e.kind,
+                    message=str(e),
+                    suggestion="Provide a public https:// link to a PDF/EPUB the server can reach.",
+                )
+            if not document_name:
+                stem = os.path.splitext(os.path.basename(unquote(urlsplit(url).path)))[0]
+                document_name = stem or "Document"
+            return await remarkable_upload(
+                path,
+                parent_folder=parent_folder,
+                document_name=document_name,
+                defer_restart=defer_restart,
+            )
+
     if _is_ssh_mode() or _is_cloud_mode():
 
         @mcp.tool(annotations=MKDIR_ANNOTATIONS)
