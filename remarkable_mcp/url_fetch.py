@@ -39,7 +39,7 @@ def _public_ip(host: str, port: int) -> str:
     return ips[0]
 
 
-def _sniff(path: str) -> Optional[str]:
+def sniff(path: str) -> Optional[str]:
     """Return 'pdf'/'epub' by content (not Content-Type/extension), else None."""
     with open(path, "rb") as f:
         if f.read(5) == b"%PDF-":
@@ -109,7 +109,7 @@ def download(url: str, dest_dir: str) -> Tuple[str, str]:
         finally:
             resp.release_conn()
             pool.close()
-        kind = _sniff(path)
+        kind = sniff(path)
         if kind is None:
             raise FetchError("unsupported_format", "Downloaded file is not a valid PDF or EPUB")
         final = os.path.join(dest_dir, f"document.{kind}")
